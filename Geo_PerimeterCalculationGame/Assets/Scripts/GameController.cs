@@ -6,88 +6,84 @@ using UnityEngine.UI;
 
 namespace ADHD.Mat.GeoMathGame{
     public class GameController : MonoBehaviour
-    {      
+    {
+        private enum ShapeType
+        {
+            Dikdortgen,
+            DikIkizKenarUcgen,
+            EsKenarUcgen,
+            IkizKenarUcgen,
+            Kare,
+            CokKenarUcgen
+        }
+
         public static GameController Instance;
 
+        [Header("Scriptable Object")]
         [SerializeField] LevelDifficulty levelDifficulty;
 
+        [Header("Geometric Shapes")]
         [SerializeField] List<GameObject> shapes;
 
-        public GameObject buttonObj;
-        [SerializeField]
-        GameObject buttonSpawn;
-       
-        [SerializeField]
-        GameObject numberObj;
-      
-        private GameObject shownObj;
+        [Header("Game Objects")]
+        [SerializeField] GameObject starButtonPrefab;
+        [SerializeField] GameObject starButtonSpawnParent;
+        
+        [SerializeField] GameObject shapeEdgeNumberPrefab;
+        [SerializeField] GameObject shapeSpawnParent;
+        private GameObject shownShape;
 
-        [SerializeField]
-        GameObject spawnParent;
-
-        [SerializeField]
-        AudioClip crossSfx;
-        [SerializeField]
-        AudioClip checkSfx;
+        [Header("SFX and Audio Objects")]        
+        [SerializeField] AudioClip crossSfx;
+        [SerializeField] AudioClip checkSfx;
         [SerializeField] AudioSource audioSource;
-
-        [SerializeField]
-        GameObject point;
-
-        #region Clock
-        public float totalTime = 15f; // Başlangıçta ayarlanacak toplam süre
-        public bool autoStart = false; // Zamanlayıcının otomatik başlamasını sağlar
-
-        private float currentTime; // Şu anki geçen süre
-        private bool isTimerRunning = false; // Zamanlayıcının çalışıp çalışmadığını belirten bayrak
-
-        [SerializeField] TextMeshProUGUI timerText;
         [SerializeField] AudioSource timerAudioSource;
 
-        #endregion
+        [Header("UI Objects")]
+        [SerializeField] GameObject gameOverPanel;
 
+        [SerializeField] TextMeshProUGUI pointText;
+        [SerializeField] TextMeshProUGUI stopGameScoreText;
+        [SerializeField] TextMeshProUGUI timerText;
 
-
-        private GameObject btn;
-        private Button trueButton;
-
-
-        string deger;
         private float _point = 0;
-        float incrementPoint = 1;
-        int correct= 0, wrong= 0;
-
-        int difficulty= 0;
+        private float totalTime = 15f; 
+        private float currentTime; 
+        private int difficulty = 0;
+        private bool isTimerRunning = false; 
+        private string deger;
 
         private void Awake()
         {
-            DontDestroyOnLoad(this);
+            //DontDestroyOnLoad(this);
 
-            if (Instance == null)
-                Instance = this;
-            else
-                Destroy(gameObject);
+            //if (Instance == null)
+            //    Instance = this;
+            //else
+            //    Destroy(gameObject);
+
+            Instance = this;
         }
 
-        void Start()
+        private void Start()
         {
             CloneButton();
 
             ShapeSelect();
         }
 
-        void CloneButton()
+        private void CloneButton()
         {
             DestroyClonedButton();
             for (int i = 0; i < ButtonCount(); i++)
             {
-                Instantiate(buttonObj, buttonSpawn.transform);
+                Instantiate(starButtonPrefab, starButtonSpawnParent.transform);
             }
         }
 
-        void DestroyClonedButton()
+        private void DestroyClonedButton()
         {
-            foreach (Transform child in buttonSpawn.transform)
+            foreach (Transform child in starButtonSpawnParent.transform)
             {
                 Destroy(child.gameObject);
             }
@@ -98,13 +94,14 @@ namespace ADHD.Mat.GeoMathGame{
             return difficulty + 3;
         }
 
-        private void UpdateScore(float currentPoint, float increment)
+        private void UpdateScore(float currentPoint)
         {
             float time = levelDifficulty.difficulties[difficulty].addTime;
+            float increment = levelDifficulty.difficulties[difficulty].increment;
             AddTime(time);
 
-            _point = currentPoint + increment;
-            point.transform.GetComponent<TextMeshProUGUI>().text = "Point: " + _point.ToString();
+            _point =  currentPoint + increment * 1;
+            pointText.text = "Point: " + _point.ToString();
             if (levelDifficulty.difficulties[difficulty].levelUpControlValue <= _point)
             {
                 difficulty++;
@@ -112,7 +109,7 @@ namespace ADHD.Mat.GeoMathGame{
             }
         }
 
-        void ShapeSelect()
+        private void ShapeSelect()
         {
             int bound = shapes.Count;
             int rnd = Random.Range(0, bound);
@@ -123,16 +120,16 @@ namespace ADHD.Mat.GeoMathGame{
 
             GenerateLevel(rnd, isDouble, minValue, maxValue);
                       
-            calc(rnd);
+            CalculateShapeEdgeNumber((ShapeType) rnd);
         }
 
-        void GenerateLevel(int rnd, bool isDouble, double minValue, double maxValue)
+        private void GenerateLevel(int rnd, bool isDouble, double minValue, double maxValue)
         {
-            shownObj = shapes[rnd];
-            int kenarSayisi = shownObj.GetComponent<Shape>().KENARLAR.Length;
+            shownShape = shapes[rnd];
+            int kenarSayisi = shownShape.GetComponent<Shape>().KENARLAR.Length;
 
-            var scr = shownObj.GetComponent<Shape>();
-            var obj = Instantiate(shownObj, spawnParent.transform);
+            var scr = shownShape.GetComponent<Shape>();
+            var obj = Instantiate(shownShape, shapeSpawnParent.transform);
 
             System.Collections.IList control;
             if (isDouble)
@@ -175,7 +172,7 @@ namespace ADHD.Mat.GeoMathGame{
 
             for (int i = 0; i < kenarSayisi; i++)
             {
-                var num = Instantiate(numberObj, obj.transform.GetChild(i).transform);
+                var num = Instantiate(shapeEdgeNumberPrefab, obj.transform.GetChild(i).transform);
                 if (isDouble)
                 {
                     num.GetComponentInChildren<TextMeshProUGUI>().text = scr.KENARLAR[i].ToString("#0.0");
@@ -187,72 +184,65 @@ namespace ADHD.Mat.GeoMathGame{
             }
         }
 
+        private void CalculateShapeEdgeNumber(ShapeType shapeType)
+        {
+            double value = 0;
 
-        void calc(int rnd)
-            {           
-             if (rnd == 0)//dikdörtgen
-                {
-                    double value = 0;
-                    for (int i = 0; i <2 ; i++)
-                    {                    
-                        double kenar = 2 * shownObj.GetComponent<Shape>().KENARLAR[i]; 
-                        value += kenar;                    
+            switch (shapeType)
+            {
+                case ShapeType.Dikdortgen:
+                    for (int i = 0; i < 2; i++)
+                    {
+                        double kenar = 2 * shownShape.GetComponent<Shape>().KENARLAR[i];
+                        value += kenar;
                     }
-                CreateTextInButton(value);
                     Debug.Log("dik hesap: " + value);
-                }
-            if (rnd == 1)//dik ikiz kenar ücgen
-            {                              
-                  double kenar = 2 * shownObj.GetComponent<Shape>().KENARLAR[0];
-                  double value = kenar+ shownObj.GetComponent<Shape>().KENARLAR[1];
-                CreateTextInButton(value);
-                Debug.Log("dikikiz hesap: " + value);
+                    break;
+                case ShapeType.DikIkizKenarUcgen:
+                    double kenarDIK = 2 * shownShape.GetComponent<Shape>().KENARLAR[0];
+                    value = kenarDIK + shownShape.GetComponent<Shape>().KENARLAR[1];
+                    Debug.Log("dikikiz hesap: " + value);
+                    break;
+                case ShapeType.EsKenarUcgen:
+                    for (int i = 0; i < 1; i++)
+                    {
+                        double kenar = 3 * shownShape.GetComponent<Shape>().KENARLAR[i];
+                        value += kenar;
+                    }
+                    Debug.Log("eşkenar hesap: " + value);
+                    break;
+                case ShapeType.IkizKenarUcgen:
+                    double kenarIKIZ = 2 * shownShape.GetComponent<Shape>().KENARLAR[1];
+                    value = kenarIKIZ + shownShape.GetComponent<Shape>().KENARLAR[0];
+                    Debug.Log("ikiz hesap: " + value);
+                    break;
+                case ShapeType.Kare:
+                    for (int i = 0; i < 1; i++)
+                    {
+                        double kenar = 4 * shownShape.GetComponent<Shape>().KENARLAR[i];
+                        value += kenar;
+                    }
+                    Debug.Log("kare hesap: " + value);
+                    break;
+                case ShapeType.CokKenarUcgen:
+                    for (int i = 0; i < 3; i++)
+                    {
+                        double kenar = shownShape.GetComponent<Shape>().KENARLAR[i];
+                        value += kenar;
+                    }
+                    Debug.Log("ucgen hesap: " + value);
+                    break;
+                default:
+                    Debug.LogError("Bilinmeyen şekil tipi!");
+                    break;
             }
-            if (rnd == 2)//Eş kenar üçgen
-            {
-                double value = 0;
-                for (int i = 0; i < 1; i++)
-                {
-                    double kenar = 3 * shownObj.GetComponent<Shape>().KENARLAR[i];
-                    value += kenar;
-                }
-                CreateTextInButton(value);
-                Debug.Log("eşkenar hesap: " + value);
-            }
-            if (rnd== 3)//İkiz kenar Ücgen
-            {
-                double kenar = 2 * shownObj.GetComponent<Shape>().KENARLAR[1];
-                double value = kenar + shownObj.GetComponent<Shape>().KENARLAR[0];
-                CreateTextInButton(value);
-                Debug.Log("ikiz hesap: " + value);
-            }
-            if (rnd== 4)//kare
-            {
-                double value = 0;
-                for (int i = 0; i < 1; i++)
-                {
-                    double kenar = 4 * shownObj.GetComponent<Shape>().KENARLAR[i];
-                    value += kenar;
-                }
-                CreateTextInButton(value);
-                Debug.Log("kare hesap: " + value);
-            }
-            if (rnd== 5)//Çok kenar üçgen
-            {
-                double value = 0;
-                for (int i = 0; i < 3; i++)
-                {
-                    double kenar = shownObj.GetComponent<Shape>().KENARLAR[i];
-                    value += kenar;
-                }              
-                CreateTextInButton(value);
-                Debug.Log("ucgen hesap: " + value);
-            }
+
+            CreateTextInButton(value);
         }
 
-        void CreateTextInButton(double value)
+        private void CreateTextInButton(double value)
         {
-            int buttonSayisi = buttonSpawn.transform.childCount;
+            int buttonSayisi = starButtonSpawnParent.transform.childCount;
             List<int> aSayi = new List<int>();
             for (int i = 0; i < buttonSayisi; i++)
             {
@@ -269,15 +259,15 @@ namespace ADHD.Mat.GeoMathGame{
             }
 
             if (difficulty != 0)
-                buttonSpawn.transform.GetChild(bSayi[0]).GetComponentInChildren<TextMeshProUGUI>().text=  value.ToString("#0.0");
+                starButtonSpawnParent.transform.GetChild(bSayi[0]).GetComponentInChildren<TextMeshProUGUI>().text=  value.ToString("#0.0");
             else
-                buttonSpawn.transform.GetChild(bSayi[0]).GetComponentInChildren<TextMeshProUGUI>().text = value.ToString();
+                starButtonSpawnParent.transform.GetChild(bSayi[0]).GetComponentInChildren<TextMeshProUGUI>().text = value.ToString();
 
-            deger = buttonSpawn.transform.GetChild(bSayi[0]).GetComponentInChildren<TextMeshProUGUI>().text;
+            deger = starButtonSpawnParent.transform.GetChild(bSayi[0]).GetComponentInChildren<TextMeshProUGUI>().text;
 
             for (int i = 1; i < buttonSayisi; i++)
             {
-                var btn = buttonSpawn.transform.GetChild(bSayi[i]).gameObject;
+                var btn = starButtonSpawnParent.transform.GetChild(bSayi[i]).gameObject;
 
                 if (difficulty != 0)
                     btn.GetComponentInChildren<TextMeshProUGUI>().text = Random.Range(3.0F, System.Convert.ToSingle(value) + 50.0F).ToString("#0.0");
@@ -287,12 +277,7 @@ namespace ADHD.Mat.GeoMathGame{
         }
 
         public void Clicked(string item)
-        {
-            //if (difficulty != 0)
-            //    item = value.ToString("#0.0");
-            //else
-            //    buttonSpawn.transform.GetChild(bSayi[0]).GetComponentInChildren<TextMeshProUGUI>().text = value.ToString();
-
+        {         
             if (deger.Equals(item))
             {
                 StartCoroutine(Check(true));
@@ -303,34 +288,33 @@ namespace ADHD.Mat.GeoMathGame{
             }
         }
                 
-        IEnumerator Check(bool st)
+        private IEnumerator Check(bool st)
         {
             if (st)
             {
                 audioSource.PlayOneShot(checkSfx);
-                correct++;
                
                 yield return new WaitForSecondsRealtime(1.0f);
-                UpdateScore(_point, incrementPoint);
+                UpdateScore(_point);
             }
             else
             {
                 audioSource.PlayOneShot(crossSfx);
-                wrong++;
 
                 yield return new WaitForSecondsRealtime(1.0f);
             }
+
             ClearAll();
             ShapeSelect();
             yield return null;
         }
 
-        void ClearAll()
+        private void ClearAll()
         {
-            Destroy(spawnParent.transform.GetChild(0).gameObject);            
+            Destroy(shapeSpawnParent.transform.GetChild(0).gameObject);            
         }
 
-        void Update()
+        private void Update()
         {
             if (isTimerRunning)
             {
@@ -349,20 +333,19 @@ namespace ADHD.Mat.GeoMathGame{
             currentTime = totalTime;
             isTimerRunning = true;
             timerAudioSource.Play();
-            UpdateTimerText();
         }
 
-        public void StopTimer()
+        private void StopTimer()
         {
             isTimerRunning = false;
             timerAudioSource.Stop();
-            //STOP GAME
+            stopGameScoreText.text = "Score: " + _point;
+            gameOverPanel.SetActive(true);
         }
 
-        public void AddTime(float timeToAdd)
+        private void AddTime(float timeToAdd)
         {
             currentTime += timeToAdd;
-            UpdateTimerText();
         }
 
         private void UpdateTimerText()

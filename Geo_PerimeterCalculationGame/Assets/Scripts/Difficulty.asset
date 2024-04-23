@@ -17,17 +17,20 @@ MonoBehaviour:
     minValue: 3
     maxValue: 9
     addTime: 10
+    increment: 1
     isDouble: 0
     levelUpControlValue: 5
   - difficultyValue: 2
     minValue: 1
     maxValue: 20
     addTime: 5
+    increment: 1.5
     isDouble: 1
     levelUpControlValue: 15
   - difficultyValue: 3
     minValue: 15
     maxValue: 50
     addTime: 3
+    increment: 2.5
     isDouble: 1
     levelUpControlValue: 25
